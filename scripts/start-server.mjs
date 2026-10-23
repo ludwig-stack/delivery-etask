@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {spawn} from 'node:child_process';
+import nextEnv from '@next/env';
+import {getStore} from '../lib/runtime-node.ts';
+nextEnv.loadEnvConfig(process.cwd(),false);
+const args=process.argv.slice(2);
+if(args.some((arg,i)=>i%2===0&&arg!=='--port'))throw new Error('Usage: npm start -- --port 3000');
+const port=args.length?args[1]:process.env.PORT||'3000';
+if(!/^\d+$/.test(port||'')||Number(port)<1||Number(port)>65535)throw new Error('Choose a valid server port.');
+const entry=path.resolve('.next/standalone/server.js');
+if(!fs.existsSync(entry))throw new Error('Run npm run build first.');
+const store=getStore();await store.read();
+const child=spawn(process.execPath,[entry],{stdio:'inherit',env:{...process.env,NODE_ENV:'production',PORT:port,HOSTNAME:process.env.DSI_BIND_ADDRESS||'127.0.0.1',DSI_DATA_PATH:store.file}});
+child.on('error',error=>{console.error(error.message);process.exitCode=1;});
+child.on('exit',code=>{process.exitCode=code||0;});
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>child.kill(signal));

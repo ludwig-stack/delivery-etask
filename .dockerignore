@@ -1,0 +1,15 @@
+.git
+.next
+node_modules
+.data
+.data-test-*
+.handoff
+.env*
+.dev.vars*
+.local-accounts.txt
+.wrangler
+.sites-runtime
+.npm-cache
+dist
+outputs
+work

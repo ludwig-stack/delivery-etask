@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 export {sameOrigin} from './request-origin';
 
 export type Role = 'staff' | 'reviewer' | 'admin' | 'viewer';
-export type Account = {id:string;name:string;email:string;role:Role;owner:string;passwordHash:string;salt:string;delegation?:string};
+export type Account = {id:string;name:string;email?:string;username?:string;role:Role;owner:string;passwordHash:string;salt:string;delegation?:string};
 export type SessionUser = Omit<Account,'passwordHash'|'salt'> & {userId:string;displayName:string};
 const COOKIE='dsi_session';
 const enc=new TextEncoder();
