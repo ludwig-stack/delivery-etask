@@ -1,0 +1,42 @@
+TEAM DIRECTIVE: DSI PROJECT TRACKER - COMPANY HOSTING AND TEAM ROLLOUT
+
+Team,
+
+Please take over the DSI daily project tracker, place the supplied source in our company GitHub organization, and deploy it on company-controlled hosting under our own URL. Please assign one technical lead to coordinate this through launch and hand over day-to-day operation to Wyline.
+
+Reference app:
+https://dsi-daily-delivery-oct-dec-2026.ideahub-9058.chatgpt.site
+
+I am providing the source ZIP and technical handoff. Start with README.md, then docs/DEPLOYMENT_HANDOFF.md. The package includes the application, base plan, database schema, validation rules and existing Excel/PDF/CSV/diagram downloads. It does not include the hosted production database or any later staff updates.
+
+1. GITHUB AND HOSTING
+Create a private company repository and confirm the hosting architecture, technical owner and staging date. Suggested URL for confirmation: projects.ideahubsolutions.com. If we use our existing Linux/cloud server, adapt the application runtime and database for that server. If our own Cloudflare account is a better fit, propose it with the cost and ownership details. The present app uses a Cloudflare Worker/D1 and ChatGPT-provided sign-in; it requires a hosting/authentication migration. Its current npm start command is a local preview, not a production server command.
+
+2. COMPANY LOGIN AND ROLES
+Give staff individual company-approved accounts. Wyline is the program owner and reviewer. Staff must be able to submit their assigned work, actual output, proof and blockers. Wyline or an explicitly authorized delegate approves completion and milestone results. Enforce these permissions on the server. The current version records a reviewer name but does not yet restrict approval to Wyline's authenticated account.
+
+3. KEEP THE DELIVERY WORKFLOW
+Preserve the 494 dated assignments, 21 milestones, Gantt, daily map, responsibility chart, targets, recovery desk and change history. Keep original deadlines visible. A missed task must show the reason, help needed, recovery owner and recovery date. A report saying a target was missed must not turn that milestone green. Use America/Los_Angeles for business dates.
+
+4. DATA, TESTING AND CUTOVER
+Check whether staff have already entered live updates. If so, arrange a complete database export/import and reconciliation before switching. The app's current snapshot contains only the latest 150 audit events, so it is not a full-history backup. Configure HTTPS, persistent storage, backups, monitoring and a tested rollback. Designate one writable master after cutover.
+
+Demonstrate the complete flow with Wyline and one staff user: sign in, submit proof, review, accept, display the shared update, flag a blocked task, assign recovery and confirm the original deadline remains. Also prove that ordinary staff cannot approve their own work or impersonate Wyline.
+
+5. WYLINE AND TEAM ONBOARDING
+After technical testing, arrange a 30-minute walkthrough with Wyline. Provide a one-page user guide and a short screen recording. Coordinate with her to onboard the staff, map accounts to names, confirm the two setters with Nova, and agree the daily reporting routine. Give the team one company URL and one support contact.
+
+6. FUTURE AI EMPLOYEE REPORTING
+Prepare phase two so our AI employees can submit reports into this system. Emman should coordinate agent requirements, Ludwig the API/integration work, and Alvin the CQL data mapping, with Wyline validating the business workflow. Confirm those technical assignments.
+
+Use a separate reporting API with one scoped service account per AI employee, evidence references, run IDs, duplicate prevention and an audit trail. AI reports must enter Pending Review. Wyline or an authorized human approves them before they change accepted work or official results. AI must not approve itself, change targets, or count the same inquiry/appointment twice. Start with one reporting agent and reconcile it against manual reports for three business days before expanding. The detailed proposed API design is in docs/AI_REPORTING_DESIGN.md; it is not implemented yet.
+
+FIRST RESPONSE REQUESTED - WITHIN ONE BUSINESS DAY
+Q1: Who is the technical lead, and what private GitHub repository will we use?
+Q2: Which company hosting environment and final hostname do you recommend, and what will sign-in require?
+Q3: What is your staging date and Wyline walkthrough date, with a separate estimate for the AI reporting phase?
+
+Please return the final URL, repository URL, named technical/hosting owners, access instructions, test evidence, backup/rollback details and support contact when ready. Prioritize launching the human reporting workflow, then add AI reporting in a controlled second phase.
+
+Thank you,
+CEO

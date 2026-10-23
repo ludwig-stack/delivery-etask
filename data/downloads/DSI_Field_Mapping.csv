@@ -1,0 +1,13 @@
+﻿source_field,type,destination_concept,rule
+task_id,string unique,External stable task key,Upsert existing T0001–T0494; do not create duplicates. Proposed support T0495–T0574 only after assignment.
+owner_id / owner_name,string,Assignee,Resolve to real user IDs. Do not create or invite accounts automatically. Setter1/2 require named operators.
+planned_date / original_due_date / original_due_time,YYYY-MM-DD / HH:MM,Schedule date / original deadline,Preserve existing original deadline and missed-history record; recovery date is separate. Blank original time on a new proposed row is not an instruction to erase an existing value.
+due_time_local / timezone / due_at_iso,local time / IANA zone / ISO8601,Due timestamp,"Prefer due_at_iso or calculate using America/Los_Angeles. PDT throughOct31, PST fromNov1. Later cutoffs proposed."
+dependency_ids_json / gate_ids_json / social_ids_json,JSON string arrays,Relations,"Parse arrays, then resolve stable IDs in a second pass. Gate IDs are a different entity, not task-row positions."
+target / unit / target_mode,number / string / enum,Work target and interpretation,"Checklist requires the defined output; goal is best-effort result; capacity is a conditional working target, not a guaranteed outcome or reason to invent activity."
+estimate_hours,decimal,Planned effort,Inclusive of reviews/reporting. Do not add additional hours for the daily report.
+acceptance_criteria / evidence_required / reviewer_role,text,Acceptance requirements,Map to description/checklist/custom fields as supported. Review is not Accepted.
+outcome_contribution / next_handoff,text,Purpose and receiving owner,Keep visible so every deliverable supports inquiry/booking movement.
+initial_status_for_new_task_only,Ready,New-task initialization only,"Never overwrite existing status or progress. Status, actuals, evidence, audit history and accepted timestamps are omitted from planning imports."
+assignment_state / due_basis / source_kind,text,Planning assumptions,"Keep proposed support, staffing pending and client-request distinctions visible."
+Daily calendar daily_* / cumulative_*,integer target,Shared team outcome goals,Do not add cumulative values across dates. Channel bookings are subsets; no individual appointment quotas for engineers.

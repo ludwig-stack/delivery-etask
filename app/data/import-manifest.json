@@ -1,0 +1,14 @@
+{
+  "schema": "dsi-plan-integration/1",
+  "sourceVersion": "2026-10-22-v2-files",
+  "sha256": "2a38142375e297f9db4938a46d41b179a27361f4544420140aa5f22de1036cc1",
+  "counts": {
+    "core": 494,
+    "inactiveSupport": 80,
+    "dates": 60,
+    "gates": 21,
+    "people": 15,
+    "social": 20
+  },
+  "progressPolicy": "Preserve existing progress by stable ID; never write delivery_events during plan integration."
+}

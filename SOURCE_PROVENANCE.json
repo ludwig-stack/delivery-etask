@@ -1,0 +1,25 @@
+{
+  "export_name": "DSI_Tracker_Source_Handoff_2026-10-22",
+  "planning_date": "2026-10-22",
+  "timezone": "America/Los_Angeles",
+  "source_commit": "acf4a6c9b6af7d262984ba977bbc78f5e2c453d3",
+  "published_version": 1,
+  "reference_url": "https://dsi-daily-delivery-oct-dec-2026.ideahub-9058.chatgpt.site",
+  "base_plan_sha256": "c7ec805cbe8d65b1f41def63a9ac0afc96da92fa8aa10f223b27f34b50ce57ad",
+  "export_changes": [
+    "Added handoff README and docs",
+    "Renamed original README to README_PLATFORM_BASELINE.md",
+    "Removed original managed project_id from .openai/hosting.json"
+  ],
+  "excluded": [
+    "Git metadata/history",
+    "node_modules",
+    "build output",
+    "runtime state",
+    "environment secrets",
+    "credentials",
+    "local and production databases",
+    "hosted progress and complete audit history"
+  ],
+  "migration_status": "Company hosting, company auth/RBAC, full-data import and AI reporting are not implemented by this export."
+}
