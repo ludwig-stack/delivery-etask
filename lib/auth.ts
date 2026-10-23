@@ -1,5 +1,6 @@
-import { env } from 'cloudflare:workers';
+import { runtimeEnv } from '@delivery/runtime';
 import { cookies } from 'next/headers';
+export {sameOrigin} from './request-origin';
 
 export type Role = 'staff' | 'reviewer' | 'admin' | 'viewer';
 export type Account = {id:string;name:string;email:string;role:Role;owner:string;passwordHash:string;salt:string;delegation?:string};
@@ -9,7 +10,7 @@ const enc=new TextEncoder();
 const hex=(bytes:ArrayBuffer)=>Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
 const bytes=(value:string)=>Uint8Array.from(value.match(/.{2}/g)||[],x=>parseInt(x,16));
 export function authConfig() {
-  const config=env as unknown as {AUTH_USERS_JSON?:string;SESSION_SECRET?:string};
+  const config=runtimeEnv;
   const users:Account[]=JSON.parse(config.AUTH_USERS_JSON||'[]');
   if(!config.SESSION_SECRET || config.SESSION_SECRET.length<32 || !users.length) throw new Error('Run npm run setup:local to configure local accounts.');
   return {users,secret:config.SESSION_SECRET};
@@ -45,9 +46,5 @@ export async function getSessionUser():Promise<SessionUser|null> {
     const {passwordHash:_hash,salt:_salt,...safe}=account;
     return {...safe,userId:account.id,displayName:account.name};
   } catch {return null;}
-}
-export function sameOrigin(request:Request) {
-  const origin=request.headers.get('origin');
-  return !!origin && origin===new URL(request.url).origin;
 }
 export const isReviewer=(user:SessionUser)=>user.role==='reviewer';

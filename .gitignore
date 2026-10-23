@@ -83,3 +83,6 @@ yarn-error.log*
 .handoff/
 /.npm-cache/
 /.local-accounts.txt
+/.data/
+/.data-test-*/
+!.env.example

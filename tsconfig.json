@@ -24,6 +24,7 @@
       }
     ],
     "paths": {
+      "@delivery/runtime": ["./lib/runtime-node.ts"],
       "@/*": [
         "./*"
       ]

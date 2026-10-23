@@ -1,10 +1,10 @@
 # Delivery eTask — DSI daily delivery
 
-A working DSI execution workspace based on the supplied October 23 deployment handoff and current 60-day schedule. Built with React, Vinext/Vite, a Cloudflare Worker, and D1/SQLite.
+A working DSI execution workspace based on the supplied October 23 deployment handoff and current 60-day schedule. The default runtime is Next.js on Node/Vercel, with persistent D1 access through a server-only adapter. The original Cloudflare Worker build is also available.
 
 ## Run locally
 
-Use Node.js 22.13 or newer. From this directory:
+Use Node.js 22 (22.13 or newer within that major version). From this directory:
 
 ```sh
 npm ci
@@ -16,7 +16,31 @@ npm run dev
 
 Open **http://localhost:5173**. Generated development sign-in details are in **`.local-accounts.txt`**. Local accounts include Wyline (reviewer), Joey (staff), Nova (results entry), a delegated reviewer for Wyline-owned work, and a read-only stakeholder. Passwords are randomly generated; `.dev.vars` and the credential file are ignored by Git. Repeating setup preserves existing accounts and data.
 
-`npm run dev` provides hot reload. To preview the built Worker, stop dev and run `npm start -- --port 5173`. The start wrapper loads local secrets beside Wrangler's generated configuration. It is a local preview, not a generic Node production server.
+`npm run dev` runs Next.js with hot reload. To run its production build locally, stop dev and run `npm start -- --port 5173`. Local accounts are copied into ignored `.env.local` without replacing existing configuration. Local SQLite reuses the existing Wrangler database when exactly one is present; otherwise it creates `.data/delivery.sqlite`. Set `DSI_SQLITE_PATH` when selecting another local database. Existing events are never reset.
+
+For the original Worker runtime, use `npm run dev:worker`, `npm run build:worker`, and `npm run start:worker -- --port 5173`. These retain the native D1 binding and `.dev.vars` configuration.
+
+## Deploy on Vercel
+
+The previous `NEXT_NO_ROUTES_MANIFEST` failure came from running the Vinext Worker build while Vercel expected Next.js output. `npm run build` now runs `next build` and generates `.next/routes-manifest.json`. `vercel.json` declares the Next.js framework, build command, and `.next` output directory. The Node major version is pinned to `22.x` in both package manifests.
+
+In Vercel, deploy this updated source with the **Next.js** preset, **`npm run build`** build command, and **`.next`** output directory. Remove any old `vinext`, `dist`, or Worker-specific dashboard overrides.
+
+Set these **server-only Environment Variables** for the target environment before testing sign-in:
+
+| Variable | Value |
+| --- | --- |
+| `SESSION_SECRET` | A new random secret of at least 32 characters, managed by the hosting owner |
+| `AUTH_USERS_JSON` | Approved account definitions: `id`, `name`, `email`, `owner`, `role`, `salt`, `passwordHash`, and optional reviewer `delegation` |
+| `CLOUDFLARE_ACCOUNT_ID` | The company Cloudflare account ID |
+| `CLOUDFLARE_D1_DATABASE_ID` | The existing company staging or production D1 database ID |
+| `CLOUDFLARE_D1_API_TOKEN` | A server-held API token with D1 edit permission in the intended account |
+
+`.env.example` lists the names without secret values. Do not prefix any with `NEXT_PUBLIC_`, commit credentials, or copy development credentials into production. Account password hashes use PBKDF2 SHA-256, 100,000 iterations, a per-account string salt, and a 32-byte hex output; `scripts/setup-local.mjs` shows the format. Preview and production should use separate databases and secrets.
+
+The D1 database must already contain the reviewed migrations in `drizzle/0000_brief_taskmaster.sql` and `drizzle/0001_auth_attempts.sql`. Apply pending migrations through the database owner's approved process; do not replay a migration against an existing table. This change does not create a cloud resource, run remote migrations, or transfer live progress. Database IDs and credentials are not needed at build time; without them the build and login screen work, but sign-in and data saves remain unavailable. Vercel explicitly refuses local SQLite so records cannot disappear into a temporary serverless filesystem.
+
+The adapter uses [Cloudflare's D1 query API](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/query/), preserves the SQL schema and unique record-version constraint, and keeps tokens out of the browser. HTTP queries are subject to Cloudflare API limits; monitor request volume and use native Workers/D1 or a dedicated data service for higher-volume operation. The original native Worker binding remains available through the optional Worker scripts.
 
 ## Included workflows
 
@@ -51,7 +75,7 @@ npm run build
 
 The unit checks cover schedule reconciliation, inactive proposals, social mix, office starts, DST, evidence and prerequisite validation, recovery dates, and metric counting rules.
 
-For API verification, use a **fresh isolated local database**, never the team's working database. Initialize it using the same local schema with a different `--persist-to` path, then start `npm start -- --persist-to .wrangler/qa-state --port 5174`. `npm run test:api` checks 25 authentication, authorization, conflict, persistence, metric, download, and backup cases. It refuses a non-loopback target and expects empty event history. The bundled Vinext/Wrangler preview sometimes returns 503 for a foreign Origin before the application runs; the test confirms rejection, and the application independently requires a matching Origin for writes.
+For API verification, use a **fresh isolated local database**, never the team's working database. Set `DSI_SQLITE_PATH` to a new path, such as `.data/qa.sqlite`, then start `npm start -- --port 5174`. The local schema initializes automatically. `npm run test:api` checks 25 authentication, authorization, conflict, persistence, metric, download, and backup cases. It refuses a non-loopback target and expects empty event history. `npm test` also checks D1 HTTP parameter binding, provider-error handling, Vercel storage safeguards, SQLite version conflicts, and incoming-host validation. No remote database was contacted by these checks.
 
 ## Backup and restore
 
@@ -65,6 +89,6 @@ The restoration tool verifies event IDs, payloads, timestamps and uninterrupted 
 
 ## Company deployment work remaining
 
-No external deployment, DNS changes, company account creation, or live progress migration was performed. Before production, configure company-owned staging and production D1 databases, real Worker bindings, HTTPS, company identity/account enrollment, reviewer delegations, and operational backups. Replace the development accounts and secret with approved production identities, or connect the session layer to company SSO. The app currently uses configured accounts; it does not include a self-service roster editor, password reset, or an SSO integration. Account definitions must be managed as hosting secrets. The supplied D1 ID is a local placeholder.
+No external deployment, DNS changes, company account creation, or live progress migration was performed. Before production, configure company-owned staging and production D1 databases, the Vercel server environment above (or native Worker bindings), HTTPS, company identity/account enrollment, reviewer delegations, and operational backups. Replace the development accounts and secret with approved production identities, or connect the session layer to company SSO. The app currently uses configured accounts; it does not include a self-service roster editor, password reset, or an SSO integration. Account definitions must be managed as hosting secrets. The supplied Worker D1 ID remains a local placeholder.
 
-The original source is preserved as the architecture foundation; this is not a PostgreSQL/Node server port. Existing hosted progress requires a full authorized event export and reconciliation. Support activation and roster changes need a reviewed planning/account update. AI reporting and automatic CQL synchronization remain proposed phase-two integrations.
+The original source is preserved as the architecture foundation. Next.js/Node deployment now uses the existing SQLite schema through an adapter; this is not a PostgreSQL migration. Existing hosted progress stays in D1 and requires a full authorized event export and reconciliation if moved to another database. Support activation and roster changes need a reviewed planning/account update. AI reporting and automatic CQL synchronization remain proposed phase-two integrations.

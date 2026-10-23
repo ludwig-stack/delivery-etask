@@ -3,19 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22.13.0"
+    "node": "22.x"
   },
   "scripts": {
     "install:ci": "node scripts/install-ci.mjs",
-    "dev": "node scripts/run-framework.mjs dev",
-    "build": "node scripts/run-framework.mjs build",
-    "start": "node --import ./scripts/sites-env.mjs scripts/preview.mjs",
+    "dev": "next dev --hostname 127.0.0.1 --port 5173",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1",
+    "dev:worker": "node scripts/run-framework.mjs dev",
+    "build:worker": "node scripts/run-framework.mjs build",
+    "start:worker": "node --import ./scripts/sites-env.mjs scripts/preview.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "setup:local": "node scripts/setup-local.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "db:local": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file scripts/local-schema.sql",
+    "db:local": "node --experimental-strip-types scripts/db-local.mjs",
     "test:api": "node scripts/test-api.mjs",
     "plan:verify": "node --experimental-strip-types --test tests/delivery.test.ts"
   },

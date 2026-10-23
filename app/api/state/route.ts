@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { getDatabase } from "@delivery/runtime";
 import { getSessionUser, isReviewer, sameOrigin } from "../../../lib/auth";
 import source from "../../data/plan.json";
 import { type Plan, type Task, gateTasks, validateTaskUpdate, validateMetrics } from "../../../lib/delivery";
@@ -13,10 +13,10 @@ export async function GET() {
   const user=await getSessionUser();
   if(!user) return Response.json({error:"Sign in to load shared progress."},{status:401});
   try {
-    if(!env.DB) throw new Error("Missing DB binding");
-    const [latest,audit]=await env.DB.batch([
-      env.DB.prepare(latestSql),
-      env.DB.prepare("SELECT * FROM delivery_events ORDER BY at DESC LIMIT 150"),
+    const db=await getDatabase();
+    const [latest,audit]=await db.batch([
+      db.prepare(latestSql),
+      db.prepare("SELECT * FROM delivery_events ORDER BY at DESC LIMIT 150"),
     ]);
     const overrides:Record<string,any>={},metrics:Record<string,any>={},milestones:Record<string,any>={};
     for(const raw of latest.results || []) {const e=decode(raw);(e.entityType==="task"?overrides:e.entityType==="milestone"?milestones:metrics)[e.entityId]={...e.payload,version:e.version,updatedAt:e.at};}
@@ -30,12 +30,12 @@ export async function POST(request:Request) {
   if(!sameOrigin(request)) return Response.json({error:"Cross-origin updates are not allowed."},{status:403});
   if(user.role==='viewer'||user.role==='admin') return Response.json({error:'Your account has read-only delivery access.'},{status:403});
   try {
-    if(!env.DB) throw new Error("Missing DB binding");
+    const db=await getDatabase();
     const body:any=await request.json();
     if(!body || typeof body.data!=='object' || body.data===null || Array.isArray(body.data)) return Response.json({error:'Enter a valid record update.'},{status:400});
     if(!["task","milestone","metrics"].includes(body.entityType) || typeof body.entityId!=="string") return Response.json({error:"Unknown record type."},{status:400});
     if(!Number.isInteger(body.version)||body.version<0) return Response.json({error:"Refresh to get the current record version."},{status:400});
-    const rows=await env.DB.prepare(latestSql).all();
+    const rows=await db.prepare(latestSql).all();
     const latest=(rows.results||[]).map(decode);
     const previous=latest.find(e=>e.entityType===body.entityType&&e.entityId===body.entityId);
     if((previous?.version||0)!==body.version) return Response.json({error:"Someone updated this record while you were editing. Refresh, review their change, then save again."},{status:409});
@@ -63,7 +63,7 @@ export async function POST(request:Request) {
     const at=new Date().toISOString(),version=body.version+1,id=crypto.randomUUID();
     value.version=version;value.updatedAt=at;
     try {
-      await env.DB.prepare("INSERT INTO delivery_events (id,entity_type,entity_id,version,payload,actor_id,actor_name,at) VALUES (?,?,?,?,?,?,?,?)").bind(id,body.entityType,body.entityId,version,JSON.stringify(value),user.userId,user.displayName,at).run();
+      await db.prepare("INSERT INTO delivery_events (id,entity_type,entity_id,version,payload,actor_id,actor_name,at) VALUES (?,?,?,?,?,?,?,?)").bind(id,body.entityType,body.entityId,version,JSON.stringify(value),user.userId,user.displayName,at).run();
     } catch(error) {
       if(String(error).includes("UNIQUE")) return Response.json({error:"Another teammate saved first. Refresh this record before saving again."},{status:409});
       throw error;
