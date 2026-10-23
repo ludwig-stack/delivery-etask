@@ -3,9 +3,23 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Vercel packages its own functions; standalone output is for self-hosting.
   output: process.env.VERCEL ? undefined : 'standalone',
-  // Include Next's public entrypoints so the isolated server never resolves a
-  // second Next installation from a parent checkout (separate request contexts).
-  outputFileTracingIncludes: {'/*':['./node_modules/next/**/*']},
+  // The Vercel launcher loads Next's node-environment before route execution.
+  // Trace those runtime files and their external helpers explicitly. The same
+  // files keep standalone servers from resolving a parent Next installation.
+  outputFileTracingIncludes: {'/*':[
+    './node_modules/next/**/*',
+    './node_modules/@swc/helpers/**/*',
+    './node_modules/tslib/**/*',
+    './node_modules/@next/env/**/*',
+    './node_modules/styled-jsx/**/*',
+    './node_modules/react/**/*',
+    './node_modules/react-dom/**/*',
+    './node_modules/react-server-dom-webpack/**/*',
+    './node_modules/scheduler/**/*',
+    './node_modules/client-only/**/*',
+    './node_modules/baseline-browser-mapping/**/*',
+    './node_modules/caniuse-lite/**/*',
+  ]},
   outputFileTracingExcludes: {'/*':['./.data/**','./.data-test-*/**','./**/*.sqlite','./**/*.sqlite-*','./**/*.db','./**/*.db-*','./.handoff/**','./.env*','./.dev.vars*','./.local-accounts.txt','./.wrangler/**','./.npm-cache/**','./dist/**']},
 };
 

@@ -53,6 +53,8 @@ For a separate environment or a new Cloudflare account:
 
 Never use `NEXT_PUBLIC_` for secrets. Production account configuration is separate from local development accounts. Set the database Worker's secret before routing application traffic to it. Keep different secrets and URLs for staging and production.
 
+Code is shared through the Git repository; credentials are private environment configuration and must never be committed. To use the same accounts locally and on Vercel, keep the approved `AUTH_USERS_JSON` account configuration and `SESSION_SECRET` synchronized in the local ignored environment files and Vercel Production settings. Account hashes, usernames, roles and owner names must match. The ignored `.local-accounts.txt` stores the corresponding private sign-in details. Existing local setup preserves these settings. A fresh clone requires its private environment configuration separately. Redeploy Vercel after changing its environment variables.
+
 Run `npm run db:check` using the target environment before rollout. Verify sign-in, a saved update visible in another session, and a complete event export. Redeploy Next.js after changing its environment variables.
 
 Vercel hosts Next.js while D1 and the database Worker remain in the company Cloudflare account. A standalone Node host uses `npm run build` and `npm start`; Docker Compose reads `.env.production.local`. Configure HTTPS through the hosting platform or reverse proxy. The database Worker uses D1's binding API rather than Cloudflare's account-wide administrative query API.
@@ -77,7 +79,7 @@ Reviewers and technical administrators can select **Export → Full event histor
 
 ## Included workflows and plan
 
-Daily delivery, work board, timeline, calendar, evidence-backed reports, account-bound review, milestone gates, recovery plans, daily results, cumulative scorecards and full-history exports remain available. Staff submit assigned work; reviewers accept or recover work and cannot accept their own tasks. Viewers and technical administrators cannot modify delivery records.
+Daily delivery, work board, timeline, calendar, evidence-backed reports, account-bound review, milestone gates, recovery plans, daily results, cumulative scorecards and full-history exports remain available. Staff submit assigned work; reviewers accept or recover work and cannot accept their own tasks. Administrators can update all deliverables, accept and reopen work, manage gates and recovery, record daily results, and export backups. Administrator approvals retain the signed-in identity and audit history. Viewers cannot modify delivery records.
 
 The current plan covers October 22–December 20, 2026 in `America/Los_Angeles`: 494 stable core tasks, 21 gates, 60 dates, 15 roles and 20 social posts. The 80 support proposals remain inactive. Unknown blank stays distinct from measured zero. Execution ends December 16; December 17–18 are review/recovery; December 19–20 require agreed coverage. No actual results were invented.
 

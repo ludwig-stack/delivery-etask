@@ -53,4 +53,17 @@ await expect(await call('/api/backup',{cookie:staff}),403,'Backup restricted');
 const backup=await expect(await call('/api/backup',{cookie:reviewer}),200,'Full event backup');
 const full=await backup.json();assert.equal(full.events.length,3);
 fs.mkdirSync('.handoff',{recursive:true});fs.writeFileSync('.handoff/qa-backup.json',JSON.stringify(full,null,2));
+if(process.env.DSI_TEST_ADMIN_PASSWORD){
+ const signIn=await expect(await call('/api/auth/login',{body:{email:'qa-admin',password:process.env.DSI_TEST_ADMIN_PASSWORD}}),200,'Admin sign-in');
+ const admin=signIn.headers.get('set-cookie').split(';')[0];
+ const adminTask=await expect(await call('/api/state',{cookie:admin,body:{...update,version:2,data:{...data,status:'Accepted',acceptedBy:'Impersonated'}}}),200,'Admin accepts own assigned work without delegation');
+ const adminValue=(await adminTask.json()).value;
+ assert.equal(adminValue.acceptedBy,'QA administrator');assert.match(adminValue.reviewNote,/Administrator approval/);
+ await expect(await call('/api/state',{cookie:admin,body:{...update,version:3,data:{...data,status:'In progress'}}}),200,'Admin reopens accepted work');
+ await expect(await call('/api/state',{cookie:admin,body:{...update,entityId:own.id,data:{...data,status:'Review'}}}),200,'Admin edits another owner');
+ await expect(await call('/api/state',{cookie:admin,body:{entityType:'milestone',entityId:'M02',version:0,data:{...data,status:'In progress'}}}),200,'Admin edits milestone gate');
+ await expect(await call('/api/state',{cookie:admin,body:{entityType:'metrics',entityId:task.date,version:1,data:{booked:0,evidence:'QA-only administrator report'}}}),200,'Admin records results');
+ await expect(await call('/api/backup',{cookie:admin}),200,'Admin exports full history');
+ await expect(await call('/api/state',{cookie:viewer,body:update}),403,'Viewer remains read-only after admin changes');
+}
 console.log(`Passed ${checks} API checks. Evidence persisted across separate account sessions. Full history: ${full.events.length} events.`);

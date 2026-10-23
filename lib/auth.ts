@@ -50,4 +50,3 @@ export async function getSessionUser():Promise<SessionUser|null> {
     return {...safe,userId:account.id,displayName:account.name};
   } catch {return null;}
 }
-export const isReviewer=(user:SessionUser)=>user.role==='reviewer';
