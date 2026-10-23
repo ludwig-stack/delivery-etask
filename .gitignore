@@ -43,6 +43,10 @@ yarn-error.log*
 /.local-accounts.txt
 /.data/
 /.data-test-*/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
 
 # Workspace scaffolding and publication archives
 /.agents/

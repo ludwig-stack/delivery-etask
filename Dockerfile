@@ -8,7 +8,7 @@ RUN npm run build
 
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000 DSI_DATA_PATH=/app/data/delivery.json
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000 DSI_DATA_PATH=/app/data/delivery.sqlite
 RUN mkdir -p /app/data && chown node:node /app/data
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 USER node

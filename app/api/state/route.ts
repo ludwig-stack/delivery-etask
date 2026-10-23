@@ -1,5 +1,5 @@
 import {getStore} from '@delivery/runtime';
-import {StoreConflict,type EventRow} from '../../../lib/json-store';
+import {StoreConflict,type EventRow} from '../../../lib/store-events';
 import {getSessionUser,isReviewer,sameOrigin} from '../../../lib/auth';
 import source from '../../data/plan.json';
 import {type Plan,type Task,gateTasks,validateTaskUpdate,validateMetrics} from '../../../lib/delivery';

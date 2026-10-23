@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {SqliteStore} from '../lib/sqlite-store.ts';
+const [input='.data/delivery.json',output='.data/delivery.sqlite']=process.argv.slice(2);
+if(fs.existsSync(input+'.lock'))throw new Error('The JSON database has a writer lock. Stop the old app and inspect the lock before migration.');
+if(!['.sqlite','.db'].includes(path.extname(output)))throw new Error('Usage: npm run data:migrate -- existing.json new-database.sqlite');
+if(path.resolve(output).startsWith(path.resolve('public')+path.sep))throw new Error('The database must be outside public/.');
+const original=fs.readFileSync(input,'utf8');
+const store=new SqliteStore(output);
+await store.importJson(JSON.parse(original));
+console.log(`Migrated ${(await store.allEvents()).length} events to ${store.file}. Original JSON and login attempts were preserved. Set DSI_DATA_PATH to this SQLite file.`);

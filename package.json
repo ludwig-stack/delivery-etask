@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "db:local": "node --experimental-strip-types scripts/db-local.mjs",
+    "data:migrate": "node --experimental-strip-types scripts/migrate-json.mjs",
     "data:restore": "node --experimental-strip-types scripts/restore-backup.mjs",
     "test:api": "node scripts/test-api.mjs",
     "plan:verify": "node --experimental-strip-types --test tests/delivery.test.ts"
