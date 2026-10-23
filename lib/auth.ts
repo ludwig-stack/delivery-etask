@@ -5,14 +5,17 @@ export {sameOrigin} from './request-origin';
 export type Role = 'staff' | 'reviewer' | 'admin' | 'viewer';
 export type Account = {id:string;name:string;email?:string;username?:string;role:Role;owner:string;passwordHash:string;salt:string;delegation?:string};
 export type SessionUser = Omit<Account,'passwordHash'|'salt'> & {userId:string;displayName:string};
+export class AuthConfigurationError extends Error {}
 const COOKIE='dsi_session';
 const enc=new TextEncoder();
 const hex=(bytes:ArrayBuffer)=>Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
 const bytes=(value:string)=>Uint8Array.from(value.match(/.{2}/g)||[],x=>parseInt(x,16));
 export function authConfig() {
   const config=runtimeEnv;
-  const users:Account[]=JSON.parse(config.AUTH_USERS_JSON||'[]');
-  if(!config.SESSION_SECRET || config.SESSION_SECRET.length<32 || !users.length) throw new Error('Run npm run setup:local to configure local accounts.');
+  let users:Account[];
+  try {users=JSON.parse(config.AUTH_USERS_JSON||'[]');}
+  catch {throw new AuthConfigurationError('AUTH_USERS_JSON must be a valid array of approved accounts.');}
+  if(!config.SESSION_SECRET || config.SESSION_SECRET.length<32 || !Array.isArray(users) || !users.length) throw new AuthConfigurationError('Configure SESSION_SECRET and AUTH_USERS_JSON for this deployment environment.');
   return {users,secret:config.SESSION_SECRET};
 }
 async function key(secret:string) {return crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);}

@@ -8,11 +8,13 @@ test('origin checks use the actual host and reject forged forwarding headers',()
  assert(!sameOrigin(new Request('https://app.example/api/state',{headers:{Origin:'http://app.example',Host:'app.example'}})));
  assert(!sameOrigin(new Request('https://app.example/api/state',{headers:{Host:'app.example'}})));
 });
-test('Vercel cannot silently use an ephemeral SQLite database',()=>{
- const old=process.env.VERCEL;process.env.VERCEL='1';
- try{assert.throws(getStore,/persistent Node server/);}finally{if(old===undefined)delete process.env.VERCEL;else process.env.VERCEL=old;}
-});
-test('database files cannot be configured inside publicly served assets',()=>{
- const old=process.env.DSI_DATA_PATH;process.env.DSI_DATA_PATH='public/private.sqlite';
- try{assert.throws(getStore,/outside public/);}finally{if(old===undefined)delete process.env.DSI_DATA_PATH;else process.env.DSI_DATA_PATH=old;}
+test('D1 works on Vercel without a writable local database',()=>{
+ const keys=['VERCEL','D1_WORKER_URL','D1_WORKER_SECRET'];
+ const old=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
+ try{
+  process.env.VERCEL='1';process.env.D1_WORKER_URL='https://delivery-etask-database.example.workers.dev';process.env.D1_WORKER_SECRET='test-secret-with-at-least-32-characters';
+  assert.doesNotThrow(getStore);
+  delete process.env.D1_WORKER_SECRET;
+  assert.throws(getStore,/D1_WORKER_SECRET/);
+ }finally{for(const key of keys){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}}
 });

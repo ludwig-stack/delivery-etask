@@ -11,14 +11,19 @@
     "build": "next build && node scripts/prepare-standalone.mjs",
     "start": "node --experimental-strip-types scripts/start-server.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "setup:local": "node scripts/setup-local.mjs",
+    "setup:local": "node scripts/setup-local.mjs && node scripts/setup-d1-local.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "db:local": "node --experimental-strip-types scripts/db-local.mjs",
-    "data:migrate": "node --experimental-strip-types scripts/migrate-json.mjs",
-    "data:restore": "node --experimental-strip-types scripts/restore-backup.mjs",
+    "db:local": "wrangler dev --config wrangler.d1.jsonc --local --ip 127.0.0.1 --port 8787",
+    "db:check": "node --experimental-strip-types scripts/d1-check.mjs",
+    "data:migrate": "node --experimental-strip-types scripts/d1-import.mjs",
+    "data:restore": "node --experimental-strip-types scripts/d1-import.mjs",
     "test:api": "node scripts/test-api.mjs",
-    "plan:verify": "node --experimental-strip-types --test tests/delivery.test.ts"
+    "plan:verify": "node --experimental-strip-types --test tests/delivery.test.ts",
+    "db:migrate:local": "wrangler d1 migrations apply DB --config wrangler.d1.jsonc --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --config wrangler.d1.jsonc --remote",
+    "db:deploy": "wrangler deploy --config wrangler.d1.jsonc",
+    "test:api:d1": "node --experimental-strip-types scripts/test-d1-api.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -49,6 +54,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
     "@cloudflare/workers-types": "4.20260515.1",
+    "@electric-sql/pglite": "^0.5.11",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
@@ -66,7 +72,9 @@
     "typescript": "5.9.3",
     "vinext": "1.0.0-beta.5",
     "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "wrangler": "4.92.0",
+    "miniflare": "4.20260515.0",
+    "esbuild": "0.28.0"
   },
   "type": "module",
   "overrides": {

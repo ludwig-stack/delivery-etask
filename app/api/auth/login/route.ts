@@ -1,5 +1,5 @@
 import { getStore } from '@delivery/runtime';
-import {authConfig,passwordMatches,issueSession,sameOrigin} from '../../../../lib/auth';
+import {AuthConfigurationError,authConfig,passwordMatches,issueSession,sameOrigin} from '../../../../lib/auth';
 export async function POST(request:Request) {
   if(!sameOrigin(request)) return Response.json({error:'Use the sign-in form on this site.'},{status:403});
   try {
@@ -12,5 +12,10 @@ export async function POST(request:Request) {
     const valid=await passwordMatches(account||users[0],body.password);
     if(!account||!valid) return Response.json({error:'Email, username, or password is incorrect.'},{status:401});
     return Response.json({ok:true},{headers:{'Set-Cookie':await issueSession(account,new URL(request.url).protocol==='https:'),'Cache-Control':'no-store'}});
-  } catch {return Response.json({error:'Sign-in is not configured. Complete the local setup or contact your administrator.'},{status:503});}
+  } catch(error) {
+    console.error('Sign-in unavailable',error instanceof Error?error.message:'unknown');
+    return Response.json({error:error instanceof AuthConfigurationError
+      ?'Sign-in is not configured for this environment. Contact your workspace administrator.'
+      :'Sign-in is temporarily unavailable. Please try again or contact your workspace administrator.'},{status:503});
+  }
 }

@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  // Vercel packages its own functions; standalone output is for self-hosting.
+  output: process.env.VERCEL ? undefined : 'standalone',
   // Include Next's public entrypoints so the isolated server never resolves a
   // second Next installation from a parent checkout (separate request contexts).
   outputFileTracingIncludes: {'/*':['./node_modules/next/**/*']},

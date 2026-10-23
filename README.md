@@ -1,107 +1,99 @@
 # Delivery eTask — DSI daily delivery
 
-Next.js/React application with a **self-hosted local SQLite database**. It uses Node's built-in SQLite support; no separate database server, external database host, database credentials, or extra database driver is needed.
+Next.js/React application backed by **Cloudflare D1 (SQLite)**, matching the October 23 deployment handoff in Google Drive. The original `delivery_events` table, eight columns, version uniqueness and timestamp index are preserved. The current server uses D1; the previous Supabase adapter is retained only as legacy code.
 
-## Run locally
+Next.js calls a small authenticated Cloudflare Worker bound to D1 as `DB`. The Worker exposes only read, commit, login-limit and import operations. Database credentials stay on the server. Existing app accounts, roles and signed sessions continue to control user access.
 
-Use Node.js 22 (22.13 or newer within that major version):
+## Local setup
+
+Use Node 22 and the supplied lockfile:
 
 ```sh
 npm ci
 npm run setup:local
+npm run db:migrate:local
+```
+
+`setup:local` preserves existing accounts and prepares a random local database secret in ignored `.env.local` and `.dev.vars`. Local data persists under `.wrangler/state/`. Run these in separate terminals:
+
+```sh
 npm run db:local
 npm run dev
 ```
 
-Open **http://localhost:5173**. Development sign-in details are in ignored `.local-accounts.txt`. Setup preserves existing accounts. The app accepts either an approved email address or username.
+Open **http://localhost:5173**. Development account details are in ignored `.local-accounts.txt`. With the database Worker running, verify the connection:
 
-Progress, review history, metrics, and login attempt limits are saved in **`.data/delivery.sqlite`**. `DSI_DATA_PATH` can select another private SQLite file. Authentication definitions and the session secret remain server-only environment variables. The database file, SQLite journal files, and credentials are excluded from Git and container builds.
+```sh
+npm run db:check
+```
 
-## Persistent server deployment
+No migration runs during an application request or build. The app does not fall back to another database when D1 is unavailable. Existing files in `.data/` are preserved and are not imported automatically.
 
-Run the app on your own machine or server with a local disk or a mounted persistent volume. SQLite runs inside the app process and stores its database on that same machine. Do not place the SQLite file on a shared network filesystem or run independent replicas with separate copies.
+## Production database
 
-Vercel does not retain writable local database files. This self-hosted SQLite version therefore rejects Vercel runtime execution rather than losing database writes.
+The configured database is `delivery-etask-production` (`9902180f-386c-4b2f-a043-fc90522d6816`). Its database Worker is [delivery-etask-database](https://delivery-etask-database.rtp-bland-ghl.workers.dev). The original schema was verified, its baseline migrations were recorded, and the additive store migration was applied. Authenticated reads and rejection of unauthenticated access were verified on October 23, 2026.
 
-Create private `.env.production.local` on the server using `.env.example` as the field reference:
+The Worker secret is stored in Cloudflare and in ignored `.env.d1-worker.production`; matching connection settings are in ignored `.env.local` and `.env.production.local`. Set `D1_WORKER_URL` and `D1_WORKER_SECRET` in the hosting provider's server environment when deploying Next.js. App accounts and session secrets require their own production configuration. Local development currently connects to this configured remote database. To use the local emulator, set `.env.local` back to `http://127.0.0.1:8787` with the local secret from `.dev.vars`, then apply local migrations.
+
+For a separate environment or a new Cloudflare account:
+
+1. Create a company-owned D1 database, with separate databases and Workers for staging and production. For example, run `npx wrangler d1 create delivery-etask` in the intended Cloudflare account.
+2. Replace the placeholder database ID in `wrangler.d1.jsonc` with the returned real ID. Set the appropriate Worker and database names. Never deploy using the all-zero placeholder.
+3. Apply `npm run db:migrate:remote` to the intended database. A fresh target applies all three migrations. For a database that already has the original handoff schema, inspect its migration ledger first: mark only verified, already-applied baseline migrations as applied, then apply the additive migration. Do not rerun the original CREATE TABLE against an existing table.
+4. Set a random secret of at least 32 characters with `npx wrangler secret put D1_WORKER_SECRET --config wrangler.d1.jsonc`.
+5. Run `npm run db:deploy` and use the actual Worker URL returned by Cloudflare.
+6. Set the following server-only variables on the Next.js host (Vercel Preview/Production or the Node server):
 
 | Variable | Value |
 | --- | --- |
-| `DSI_DATA_PATH` | Absolute persistent path, such as `/srv/delivery-etask/data/delivery.sqlite` |
-| `SESSION_SECRET` | A unique random secret of at least 32 characters |
-| `AUTH_USERS_JSON` | Approved accounts with `id`, `name`, `username` or `email`, `role`, `owner`, `salt`, and `passwordHash`; optional reviewer `delegation` |
-| `DSI_BIND_ADDRESS` | `127.0.0.1` behind an HTTPS reverse proxy; `0.0.0.0` inside a container |
-| `PORT` | Internal listening port; default `3000` |
+| `D1_WORKER_URL` | Deployed database Worker's HTTPS base URL |
+| `D1_WORKER_SECRET` | Same secret configured on that Worker |
+| `SESSION_SECRET` | Random application signing secret, at least 32 characters |
+| `AUTH_USERS_JSON` | Approved application accounts, password hashes, roles and owners |
 
-Account password hashes use PBKDF2 SHA-256, 100,000 iterations, a unique string salt, and a 32-byte hex output. Do not reuse development accounts or commit credentials. The approved `marco` account has technical administrator access: it can view delivery data and export backups; reviewer permissions remain separate.
+Never use `NEXT_PUBLIC_` for secrets. Production account configuration is separate from local development accounts. Set the database Worker's secret before routing application traffic to it. Keep different secrets and URLs for staging and production.
 
-```sh
-npm ci
-npm run build
-npm start
-```
+Run `npm run db:check` using the target environment before rollout. Verify sign-in, a saved update visible in another session, and a complete event export. Redeploy Next.js after changing its environment variables.
 
-The production build includes a standalone server with its static assets. The start command initializes or validates the SQLite file and passes an absolute data path to the server. Set an HTTPS reverse proxy in front of the internal port. Keep the persistent data directory when replacing a release.
+Vercel hosts Next.js while D1 and the database Worker remain in the company Cloudflare account. A standalone Node host uses `npm run build` and `npm start`; Docker Compose reads `.env.production.local`. Configure HTTPS through the hosting platform or reverse proxy. The database Worker uses D1's binding API rather than Cloudflare's account-wide administrative query API.
 
-### Container option
+## Data migration and backups
 
-```sh
-docker compose up --build -d
-```
+The Drive folder provides schema and planning files, **not hosted progress or a database backup**. Do not treat those planning files as live results. Stop writers and obtain a full authorized event export before moving live progress.
 
-Compose reads `.env.production.local`, uses a named `delivery-data` volume at `/app/data`, and binds the app to `127.0.0.1:3000` on the host. The image runs as an unprivileged user. Container replacements retain the volume; do not remove that volume when updating. Docker's health check verifies the HTTP sign-in page.
-
-## SQLite storage, migration and recovery
-
-The database has tables for delivery events, recent login attempts, and store metadata. Every change retains its event ID, actor, timestamp, entity ID, and version. Latest state is reconstructed from the complete event history; no date advancement silently accepts work.
-
-SQLite transactions cover business validation, dependency checks, version checks, and writes. Unique constraints prevent duplicate event IDs or entity versions. Concurrent writers wait up to five seconds; stale edits return HTTP 409. SQLite rolls back incomplete transactions after a stopped process; do not manually remove SQLite journal files.
-
-To migrate the previous JSON database, stop the app first and run:
+To import an existing local database or full-history JSON export into an empty D1 target:
 
 ```sh
-npm run data:migrate -- .data/delivery.json .data/delivery.sqlite
+npm run data:migrate -- .data/delivery.sqlite
+# Or:
+npm run data:restore -- full-history-backup.json
 ```
 
-Migration preserves the complete event history, revision, timestamps, and login attempt counters. It preserves the original JSON file and refuses to replace an existing destination. Set `DSI_DATA_PATH=.data/delivery.sqlite` in your private environment configuration before restarting. If the original JSON file has a leftover lock, confirm every old writer has stopped before migration.
+SQLite and JSON-store imports retain event IDs, versions, timestamps, metadata and login attempts. A full event export restores all events and starts with fresh login counters. The import is transactional and refuses any existing target events, login activity or nonzero revision. Source files are preserved. Finish imports before allowing sign-ins. The importer supports up to 1.9 MB per serialized collection; larger histories need an offline SQL migration and reconciliation.
 
-Reviewers and technical administrators can select **Export → Full event history · JSON**. This contains every delivery event. The current snapshot contains only the latest 150 audit entries and is not a full backup. For a complete physical backup, stop the app before copying the SQLite database and any journal files together.
+The additive `drizzle/0002_d1_store.sql` migration adds metadata and event triggers without replacing the original table. Global revision checks prevent saves based on stale dependencies. Login limits use the database clock and atomic D1 batches. Failed batches roll back.
 
-```sh
-npm run data:restore -- full-history-backup.json /srv/delivery-etask/data/restored.sqlite
-```
+Reviewers and technical administrators can select **Export → Full event history · JSON**. This includes all versions; the current snapshot includes only the latest 150 audit entries. Configure D1 backups/Time Travel and test recovery before production cutover. Keep one writable master and preserve a rollback copy.
 
-Restoration validates event IDs, payloads, timestamps, and uninterrupted version sequences, then creates a **new** SQLite database. It refuses to overwrite an existing file. Login attempt counters start fresh when restoring an event export. Stop the app, inspect and reconcile the restored history, and point `DSI_DATA_PATH` at the verified file before restarting. Older full event exports using `dsi-events-backup/1` remain compatible. Older SQL stores are not read by the application; export their complete history through an authorized migration process if they contain live records.
+## Included workflows and plan
 
-## Included workflows
+Daily delivery, work board, timeline, calendar, evidence-backed reports, account-bound review, milestone gates, recovery plans, daily results, cumulative scorecards and full-history exports remain available. Staff submit assigned work; reviewers accept or recover work and cannot accept their own tasks. Viewers and technical administrators cannot modify delivery records.
 
-- Daily delivery, work board, timeline, day-by-day calendar, and team ownership.
-- Evidence-backed reports, account-bound review, independent milestone gates, and recovery plans.
-- Daily new results and cumulative scorecards; unknown blank stays distinct from measured zero.
-- Current social calendar: 10 Engage / 6 Educate / 4 Promote originals.
-- 80 support proposals remain inactive, separate from assigned work and overdue counts.
-- CSV exports, authenticated planning downloads, complete event backups, and shared audit history.
+The current plan covers October 22–December 20, 2026 in `America/Los_Angeles`: 494 stable core tasks, 21 gates, 60 dates, 15 roles and 20 social posts. The 80 support proposals remain inactive. Unknown blank stays distinct from measured zero. Execution ends December 16; December 17–18 are review/recovery; December 19–20 require agreed coverage. No actual results were invented.
 
-Staff submit their assigned work. Reviewers accept or recover work but cannot accept their own tasks. Nova and reviewers record daily results. Viewers and technical administrators cannot modify delivery records. Sessions last eight hours and use signed HTTP-only cookies.
+`app/data/plan.json` contains planning definitions; live progress stays in D1. `app/data/import-manifest.json` records planning checksums and reconciliation counts. `SOURCE_PROVENANCE.json`, `HANDOFF_MANIFEST.sha256`, `README_PLATFORM_BASELINE.md` and original files under `docs/`, `examples/` and `data/baseline-downloads/` document the imported baseline. Earlier runtime descriptions do not override this Next.js/D1 integration.
 
-## Plan and provenance
+Source: [October 23 deployment handoff](https://drive.google.com/file/d/1dZeSQf6BoZOQz-DY4OybavvO0tZGugwU/view) and the [original database files](https://drive.google.com/drive/folders/1jTVJM98-eoV2KfRBzHY0dBIrR7y9T_iZ).
 
-The current plan covers October 22–December 20, 2026, in `America/Los_Angeles`: 494 stable core tasks, 21 gates, 60 dates, 15 roles, and 20 social posts. Execution ends December 16; December 17–18 are review/recovery; December 19–20 require agreed coverage. No actual results were invented.
-
-`app/data/plan.json` holds planning definitions; live results stay in the private SQLite database. `app/data/import-manifest.json` records the planning checksum and reconciliation counts. Plan integration never changes live progress.
-
-`SOURCE_PROVENANCE.json`, `HANDOFF_MANIFEST.sha256`, `README_PLATFORM_BASELINE.md`, and the original files in `docs/`, `drizzle/`, `examples/`, and `data/baseline-downloads/` document the imported baseline. They describe earlier architecture and do not override this SQLite runtime or the current plan. The earlier Cloudflare/D1 connection is no longer used.
-
-## Verify changes
+## Verification
 
 ```sh
 npm test
 npm run typecheck
 npm run build
+npm run test:api:d1
 ```
 
-Tests cover the current plan, evidence requirements, metrics, data surviving reopening, cross-process concurrent writes, stale edits, atomic login limits, corrupt-file preservation, transaction rollback, crashed writers, JSON migration, full-history restore, and private file placement.
+D1 tests run the actual database Worker in Miniflare and check history, concurrent edits, dependency conflicts, atomic login limits, rollback, imports, baseline preservation and authentication. Legacy SQLite/Supabase tests protect the prior adapters; they do not select the production database.
 
-For the API suite, start the production app on port 5174 with `DSI_DATA_PATH` set to a **new isolated SQLite path**, then run `npm run test:api`. The suite refuses non-loopback URLs and requires empty event history. Never run it against the team's live file.
-
-Production hosting, account enrollment, HTTPS, backups, and rollout acceptance must be verified on the selected persistent server. AI reporting, automatic CQL synchronization, roster editing, and password reset remain separate work.
+After local account setup and a build, `npm run test:api:d1` starts an isolated temporary D1 database and application server, checks the complete API workflow, then stops both. It never uses the configured live database. The generic `npm run test:api` instead requires an isolated empty test database and loopback application URL. Never point that generic suite at live team data. Production rollout requires a real company D1 database ID, Worker deployment, secrets and approved accounts. AI reporting, automatic CQL synchronization, roster editing and password reset remain separate work.

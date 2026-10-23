@@ -1,4 +1,8 @@
 import fs from 'node:fs/promises';
+if(process.env.VERCEL){
+ console.log('Vercel packages the deployment; standalone server preparation is skipped.');
+ process.exit(0);
+}
 for(const name of await fs.readdir('.next/standalone')){
  if(name.startsWith('.env')||name.startsWith('.dev.vars')||['.handoff','.data','.local-accounts.txt'].includes(name))throw new Error(`Private runtime configuration was included in the build: ${name}. Do not deploy this artifact.`);
 }

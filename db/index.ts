@@ -1,2 +1,2 @@
 export {getStore} from '../lib/runtime-node';
-export {SqliteStore,latestEvents,type EventRow,type SqliteData} from '../lib/sqlite-store';
+export {D1HttpStore,D1Store,latestEvents,type EventRow,type D1Data} from '../lib/d1-store';
