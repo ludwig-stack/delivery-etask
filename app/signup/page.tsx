@@ -1,0 +1,12 @@
+'use client';
+import {useState} from 'react';
+import Link from 'next/link';
+import {Brand} from '../workspace-tools';
+import {PasswordFields} from '../password-fields';
+import {passwordStrength} from '../../lib/stage-one';
+export default function Signup(){
+ const [password,setPassword]=useState(''),[confirm,setConfirm]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
+ return <main className="login-shell signup-shell"><section className="login-intro"><div className="login-logo"><Brand login/><span>Daily delivery</span></div><h1>Join your team’s<br/>delivery workspace.</h1><p>Create your account. An administrator or reviewer will enable it before you can sign in.</p></section><section className="login-panel"><form onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');const form=new FormData(e.currentTarget);try{const response=await fetch('/api/auth/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...Object.fromEntries(form),password,confirmPassword:confirm})});const data=await response.json() as {message:string;error:string};if(!response.ok)throw new Error(data.error);setPassword('');setConfirm('');setMessage(data.message);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>
+ <span className="login-kicker">iDeaHub</span><h2>Sign up</h2>{message?<><p role="status" className="signup-success">{message}</p><Link className="button primary signup-link" href="/login">Return to sign in</Link></>:<><label>Username<input required name="username" minLength={3} maxLength={80} autoComplete="username" pattern="[a-zA-Z0-9._\-]+"/></label><PasswordFields password={password} confirm={confirm} onPassword={setPassword} onConfirm={setConfirm} disabled={busy}/><label>Email<input required name="email" type="email" maxLength={254} autoComplete="email"/></label><div className="form-row"><label>First name<input required name="firstName" maxLength={80} autoComplete="given-name"/></label><label>Last name<input required name="lastName" maxLength={80} autoComplete="family-name"/></label></div>{error&&<p className="login-error" role="alert">{error}</p>}<button className="button primary" disabled={busy||passwordStrength(password)==='weak'||password!==confirm}>{busy?'Creating account…':'Create account'}</button><Link className="text-button" href="/login">Already have an account? Sign in</Link></>}
+ </form></section></main>;
+}

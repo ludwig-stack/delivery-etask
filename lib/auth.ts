@@ -1,16 +1,14 @@
 import { runtimeEnv, getStore } from '@delivery/runtime';
 import { cookies } from 'next/headers';
+import {accountsFromRows,type Account} from './accounts';
+export type {Account,Role} from './accounts';
 export {sameOrigin} from './request-origin';
 
-export type Role = 'staff' | 'reviewer' | 'admin' | 'viewer';
-export type Account = {id:string;name:string;email?:string;username?:string;role:Role;owner:string;passwordHash:string;salt:string;delegation?:string};
 export type SessionUser = Omit<Account,'passwordHash'|'salt'> & {userId:string;displayName:string};
 export async function resolvedAccounts() {
  const {users}=authConfig();
  const {latest}=await getStore().snapshot();
- return users.map(account=>{const row=latest.find(e=>e.entity_type==='profile'&&e.entity_id===account.id);const p=row?JSON.parse(row.payload):{};
-  return {...account,...Object.fromEntries(['name','email','username','passwordHash','salt'].filter(k=>typeof p[k]==='string').map(k=>[k,p[k]]))} as Account;
- });
+ return accountsFromRows(users,latest);
 }
 export async function hashPassword(password:string,salt:string) {
  const material=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);
@@ -40,7 +38,7 @@ export async function passwordMatches(account:Account,password:string) {
 }
 export async function issueSession(account:Account,secure:boolean) {
   const {secret}=authConfig();
-  const payload=btoa(JSON.stringify({sub:account.id,exp:Date.now()+8*60*60*1000,credential:hex(await crypto.subtle.digest('SHA-256',enc.encode(account.passwordHash)))}));
+  const payload=btoa(JSON.stringify({sub:account.id,exp:Date.now()+8*60*60*1000,sessionVersion:account.sessionVersion||0,credential:hex(await crypto.subtle.digest('SHA-256',enc.encode(account.passwordHash)))}));
   const signature=hex(await crypto.subtle.sign('HMAC',await key(secret),enc.encode(payload)));
   return `${COOKIE}=${payload}.${signature}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800${secure?'; Secure':''}`;
 }
@@ -56,7 +54,7 @@ export async function getSessionUser():Promise<SessionUser|null> {
     const parsed=JSON.parse(atob(payload));
     if(typeof parsed.exp!=='number'||parsed.exp<=Date.now()) return null;
     const account=(await resolvedAccounts()).find(a=>a.id===parsed.sub);
-    if(!account || parsed.credential!==hex(await crypto.subtle.digest('SHA-256',enc.encode(account.passwordHash)))) return null;
+    if(!account || account.enabled===false || (parsed.sessionVersion||0)!==(account.sessionVersion||0) || parsed.credential!==hex(await crypto.subtle.digest('SHA-256',enc.encode(account.passwordHash)))) return null;
     const {passwordHash:_hash,salt:_salt,...safe}=account;
     return {...safe,userId:account.id,displayName:account.name};
   } catch {return null;}

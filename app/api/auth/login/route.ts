@@ -11,6 +11,7 @@ export async function POST(request:Request) {
     const account=users.find(u=>u.email?.toLowerCase()===identifier||u.username?.toLowerCase()===identifier);
     const valid=await passwordMatches(account||users[0],body.password);
     if(!account||!valid) return Response.json({error:'Email, username, or password is incorrect.'},{status:401});
+    if(account.enabled===false)return Response.json({error:'Your account is disabled or awaiting approval. Contact an administrator or reviewer.'},{status:403});
     return Response.json({ok:true},{headers:{'Set-Cookie':await issueSession(account,new URL(request.url).protocol==='https:'),'Cache-Control':'no-store'}});
   } catch(error) {
     console.error('Sign-in unavailable',error instanceof Error?error.message:'unknown');
