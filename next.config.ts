@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  ...(process.env.STAGE_ONE_LOCAL_PREVIEW ? {distDir:'.next-stage1'} : {}),
   // Vercel packages its own functions; standalone output is for self-hosting.
   output: process.env.VERCEL ? undefined : 'standalone',
   // The Vercel launcher loads Next's node-environment before route execution.
@@ -20,7 +21,7 @@ const nextConfig: NextConfig = {
     './node_modules/baseline-browser-mapping/**/*',
     './node_modules/caniuse-lite/**/*',
   ]},
-  outputFileTracingExcludes: {'/*':['./.data/**','./.data-test-*/**','./**/*.sqlite','./**/*.sqlite-*','./**/*.db','./**/*.db-*','./.handoff/**','./.env*','./.dev.vars*','./.local-accounts.txt','./.wrangler/**','./.npm-cache/**','./dist/**']},
+  outputFileTracingExcludes: {'/*':['./.next-stage1/**','./.data/**','./.data-test-*/**','./**/*.sqlite','./**/*.sqlite-*','./**/*.db','./**/*.db-*','./.handoff/**','./.env*','./.dev.vars*','./.local-accounts.txt','./.wrangler/**','./.npm-cache/**','./dist/**']},
 };
 
 export default nextConfig;

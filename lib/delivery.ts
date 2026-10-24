@@ -70,6 +70,7 @@ export function validateTaskUpdate(task: Task, input: any, tasks: Task[], people
     if(!value.blocker || !value.rescueOwner || !value.recoveryDate) return {error:"Blocked or deferred work needs the reason, a recovery owner, and a recovery date."};
     if(!people.includes(value.rescueOwner)) return {error:"Choose a recovery owner from the team."};
   }
+  if(value.status === "Review" && !value.evidence) return {error:"Attach evidence or a delivery reference before requesting review."};
   if(value.status === "Accepted") {
     if(!value.evidence) return {error:"Attach an evidence link or a specific delivery reference before accepting."};
     if(!value.acceptedBy) return {error:"Record who reviewed and accepted this deliverable."};

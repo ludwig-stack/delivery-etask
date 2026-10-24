@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./workspace.css";
+import "./stage-one.css";
+import {WorkspaceProvider} from "./workspace-tools";
 
 export const metadata: Metadata = {
   title: "DSI Daily Delivery | IdeaHub",
@@ -18,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased"><WorkspaceProvider>{children}</WorkspaceProvider></body>
     </html>
   );
 }

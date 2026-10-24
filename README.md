@@ -6,26 +6,23 @@ Next.js calls a small authenticated Cloudflare Worker bound to D1 as `DB`. The W
 
 ## Local setup
 
+Stage 1 enhancements can be reviewed with `npm run dev` (or `npm run dev:stage1`) at **http://localhost:5173**. Both commands start a separate persistent local D1 database under ignored `.data/stage-one-preview/` and a separate Next.js development build. They use the existing local accounts, apply migrations only to that local database, and never connect the preview to the configured live D1 Worker. Stop it with Ctrl+C. No Git push, Vercel deployment, or production migration is part of this enhancement.
+
+Stage 1 includes the supplied iDeaHub logo; administrator/reviewer task creation; signed-in owner filtering; assignment and mention notifications with persistent read state; clickable task links; and board moves validated by the existing server rules. Type `@` in definition of done, evidence, or working notes to choose an account by name. The inserted username identifies the recipient; stored recipient IDs preserve notifications after profile changes. The refresh/export controls are visible to administrators and reviewers.
+
+Profile timezone preferences support PST (UTC−8), PDT (UTC−7), and PHT (UTC+8). Existing and new users default to PST until they save a different preference. The dashboard header shows a live date and 12-hour clock with seconds and AM/PM. Its timezone dropdown temporarily changes only that clock; reopening the dashboard restores the saved profile preference. Activity and notification timestamps use the saved timezone. Program deadlines keep their existing Pacific schedule.
+
+The account menu opens Profile and Settings. Users can upload or capture a profile picture, edit their name/email/username, change their password with current-password confirmation, and set theme/notification preferences. Password changes invalidate older sessions. Weak passwords are rejected on the server. Administrators additionally control workspace branding, the default theme, and refresh interval. Images are limited to profile pictures and workspace branding; evidence/note images and email notifications remain Stage 2. The additive `0003_stage_one.sql` migration extends event types without replacing delivery history. Private profile credentials are excluded from state/activity responses and reviewer backups; administrator backups include account recovery data and must stay private.
+
 Use Node 22 and the supplied lockfile:
 
 ```sh
 npm ci
 npm run setup:local
-npm run db:migrate:local
-```
-
-`setup:local` preserves existing accounts and prepares a random local database secret in ignored `.env.local` and `.dev.vars`. Local data persists under `.wrangler/state/`. Run these in separate terminals:
-
-```sh
-npm run db:local
 npm run dev
 ```
 
-Open **http://localhost:5173**. Development account details are in ignored `.local-accounts.txt`. With the database Worker running, verify the connection:
-
-```sh
-npm run db:check
-```
+`setup:local` preserves existing accounts. The development launcher applies local migrations before starting Next.js and keeps preview data under `.data/stage-one-preview/`. No separate database terminal or connection-file edit is needed. Open **http://localhost:5173**. Development account details are in ignored `.local-accounts.txt`.
 
 No migration runs during an application request or build. The app does not fall back to another database when D1 is unavailable. Existing files in `.data/` are preserved and are not imported automatically.
 
@@ -33,7 +30,7 @@ No migration runs during an application request or build. The app does not fall 
 
 The configured database is `delivery-etask-production` (`9902180f-386c-4b2f-a043-fc90522d6816`). Its database Worker is [delivery-etask-database](https://delivery-etask-database.rtp-bland-ghl.workers.dev). The original schema was verified, its baseline migrations were recorded, and the additive store migration was applied. Authenticated reads and rejection of unauthenticated access were verified on October 23, 2026.
 
-The Worker secret is stored in Cloudflare and in ignored `.env.d1-worker.production`; matching connection settings are in ignored `.env.local` and `.env.production.local`. Set `D1_WORKER_URL` and `D1_WORKER_SECRET` in the hosting provider's server environment when deploying Next.js. App accounts and session secrets require their own production configuration. Local development currently connects to this configured remote database. To use the local emulator, set `.env.local` back to `http://127.0.0.1:8787` with the local secret from `.dev.vars`, then apply local migrations.
+The Worker secret is stored in Cloudflare and in ignored `.env.d1-worker.production`; matching connection settings are in ignored `.env.local` and `.env.production.local`. Set `D1_WORKER_URL` and `D1_WORKER_SECRET` in the hosting provider's server environment when deploying Next.js. App accounts and session secrets require their own production configuration. `npm run dev` overrides the database URL and secret for its child process with the isolated local emulator. It does not modify those saved connection files. Standalone production startup continues to use the configured production connection.
 
 For a separate environment or a new Cloudflare account:
 

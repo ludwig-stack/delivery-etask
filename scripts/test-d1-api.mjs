@@ -10,6 +10,9 @@ const adminPassword=crypto.randomBytes(24).toString('base64url');
 const salt=crypto.randomBytes(24).toString('hex');
 env.AUTH_USERS_JSON=JSON.stringify([...JSON.parse(env.AUTH_USERS_JSON||'[]'),{id:'qa-admin',username:'qa-admin',name:'QA administrator',role:'admin',owner:'Joey',salt,passwordHash:crypto.pbkdf2Sync(adminPassword,salt,100000,32,'sha256').toString('hex')}]);
 env.DSI_TEST_ADMIN_PASSWORD=adminPassword;
+env.DSI_STAGE_PASSWORD=crypto.randomBytes(24).toString('base64url');
+const stageAccounts=['staff','viewer'].map(role=>({id:`stage-${role}`,username:`stage-${role}`,email:`stage-${role}@local.test`,name:`Stage ${role}`,role,owner:role==='staff'?'Joey':'Nova',salt,passwordHash:crypto.pbkdf2Sync(env.DSI_STAGE_PASSWORD,salt,100000,32,'sha256').toString('hex')}));
+env.AUTH_USERS_JSON=JSON.stringify([...JSON.parse(env.AUTH_USERS_JSON),...stageAccounts]);
 const server=spawn(process.execPath,['.next/standalone/server.js'],{env,stdio:['ignore','pipe','pipe']});
 let output='',startupError;
 server.stdout.on('data',chunk=>{output+=chunk;});server.stderr.on('data',chunk=>{output+=chunk;});
@@ -24,11 +27,13 @@ try{
   await new Promise(resolve=>setTimeout(resolve,200));
  }
  if(!ready)throw new Error('Isolated app did not become ready. '+output);
+ for(const script of ['scripts/test-api.mjs','scripts/test-stage-one-api.mjs']){
  const code=await new Promise((resolve,reject)=>{
-  const checks=spawn(process.execPath,['scripts/test-api.mjs'],{env,stdio:'inherit'});
+  const checks=spawn(process.execPath,[script],{env,stdio:'inherit'});
   checks.on('error',reject);checks.on('exit',resolve);
  });
  if(code!==0)throw new Error(`D1 API checks failed (${code}). ${output}`);
+ }
 }finally{
  server.kill();await fixture.close();
 }

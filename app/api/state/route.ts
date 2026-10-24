@@ -1,9 +1,10 @@
 import {getStore} from '@delivery/runtime';
 import {StoreConflict,type EventRow} from '../../../lib/store-events';
-import {getSessionUser,sameOrigin} from '../../../lib/auth';
+import {getSessionUser,sameOrigin,resolvedAccounts} from '../../../lib/auth';
 import {canReview,canAcceptTask,canRecordMetrics} from '../../../lib/permissions';
 import source from '../../data/plan.json';
 import {type Plan,type Task,gateTasks,validateTaskUpdate,validateMetrics} from '../../../lib/delivery';
+import {validateNewTask,notificationsFor,mentionedOwners} from '../../../lib/stage-one';
 const plan=source as unknown as Plan;
 export const dynamic='force-dynamic';
 const decode=(row:EventRow)=>({id:row.id,entityType:row.entity_type,entityId:row.entity_id,version:row.version,payload:JSON.parse(row.payload),actorName:row.actor_name,at:row.at});
@@ -19,8 +20,12 @@ export async function GET(){
  try{
   const {latest,audit}=await getStore().snapshot();
   const overrides:Record<string,unknown>={},metrics:Record<string,unknown>={},milestones:Record<string,unknown>={};
-  for(const raw of latest){const e=decode(raw);(e.entityType==='task'?overrides:e.entityType==='milestone'?milestones:metrics)[e.entityId]={...e.payload,version:e.version,updatedAt:e.at};}
-  return Response.json({overrides,metrics,milestones,audit:audit.map(decode),user:{name:user.displayName},syncedAt:new Date().toISOString()},{headers:{'Cache-Control':'no-store'}});
+  for(const raw of latest.filter(e=>['task','milestone','metrics'].includes(e.entity_type))){const e=decode(raw);(e.entityType==='task'?overrides:e.entityType==='milestone'?milestones:metrics)[e.entityId]={...e.payload,version:e.version,updatedAt:e.at};}
+  const inbox=latest.find(e=>e.entity_type==='inbox'&&e.entity_id===user.id);
+  const accounts=await resolvedAccounts();
+  const directory=accounts.map(a=>({id:a.id,name:a.name,owner:a.owner,username:a.username||a.name}));
+  const notifications=notificationsFor(await getStore().allEvents(),user.owner,[...plan.tasks,...gateTasks(plan)],user.id);
+  return Response.json({overrides,metrics,milestones,audit:audit.filter(e=>['task','milestone','metrics'].includes(e.entity_type)).map(decode),notifications,inbox:{version:inbox?.version||0,readAt:inbox?JSON.parse(inbox.payload).readAt:''},directory,user:{name:user.displayName},syncedAt:new Date().toISOString()},{headers:{'Cache-Control':'no-store'}});
  }catch(error){return failure(error);}
 }
 export async function POST(request:Request){
@@ -32,21 +37,30 @@ export async function POST(request:Request){
   if(!body||!body.data||typeof body.data!=='object'||Array.isArray(body.data))throw new ApiError(400,'Enter a valid record update.');
   if(!['task','milestone','metrics'].includes(body.entityType)||typeof body.entityId!=='string')throw new ApiError(400,'Unknown record type.');
   if(!Number.isInteger(body.version)||body.version<0)throw new ApiError(400,'Refresh to get the current record version.');
+  const accounts=await resolvedAccounts();
   const row=await getStore().commitEvent(rows=>{
    const latest=rows.map(decode),previous=latest.find(e=>e.entityType===body.entityType&&e.entityId===body.entityId);
    if((previous?.version||0)!==body.version)throw new ApiError(409,'Someone updated this record while you were editing. Refresh, review their change, then save again.');
    let value:any;
    if(body.entityType==='task'||body.entityType==='milestone'){
-    const work=[...plan.tasks,...gateTasks(plan)];
-    const base=work.find(t=>t.id===body.entityId&&(body.entityType==='task'?t.workstream!=='Delivery gate':t.workstream==='Delivery gate'));
+    const custom=latest.filter(e=>e.entityType==='task'&&e.payload.custom).map(e=>({...e.payload,id:e.entityId}));
+    const work=[...plan.tasks,...custom,...gateTasks(plan)];
+    let base=work.find(t=>t.id===body.entityId&&(body.entityType==='task'?t.workstream!=='Delivery gate':t.workstream==='Delivery gate'));
+    if(!base&&body.entityType==='task'&&/^CUSTOM-[a-f0-9-]{36}$/.test(body.entityId)&&body.version===0){
+     if(!canReview(user.role))throw new ApiError(403,'Only reviewers and administrators can add deliverables.');
+     const result=validateNewTask(body.data,plan);if(result.error)throw new ApiError(400,result.error);base={...result.value!,id:body.entityId};
+    }
     if(!base)throw new ApiError(404,'This task is not in the active plan.');
     if(!canReview(user.role)&&(body.entityType==='milestone'||base.owner!==user.owner))throw new ApiError(403,'You may update only your assigned deliverables.');
     if(!canReview(user.role)&&(body.data.status==='Accepted'||previous?.payload.status==='Accepted'))throw new ApiError(403,'Only a reviewer or administrator can accept or reopen work.');
     if(body.data.status==='Accepted'&&!canAcceptTask(user.role,user.owner,base.owner))throw new ApiError(403,'A different authorized reviewer must accept your own work.');
     const tasks=work.map(t=>({...t,...latest.find(e=>e.entityId===t.id)?.payload})) as Task[];
     const accepted=body.data.status==='Accepted';
-    const result=validateTaskUpdate(base,{...body.data,version:body.version,acceptedBy:accepted?user.displayName:'',reviewNote:accepted?(user.role==='admin'?(body.data.reviewNote||`Administrator approval by ${user.displayName}.`):(user.delegation||body.data.reviewNote||'')):body.data.reviewNote},tasks,[...plan.people.map(p=>p.name),user.displayName]);
-    if(result.error)throw new ApiError(400,result.error);value=result.value;
+    const result=validateTaskUpdate(base,{...body.data,version:body.version,acceptedBy:accepted?user.displayName:'',reviewNote:accepted?(user.role==='admin'?(body.data.reviewNote||`Administrator approval by ${user.displayName}.`):(user.delegation||body.data.reviewNote||(user.owner==='Wyline'?`Approval by ${user.displayName}.`:''))):body.data.reviewNote},tasks,[...plan.people.map(p=>p.name),user.displayName]);
+    if(result.error)throw new ApiError(400,result.error);value={...result.value,acceptance:typeof body.data.acceptance==='string'?body.data.acceptance.trim().slice(0,4000):base.acceptance};
+    if(!value.acceptance)throw new ApiError(400,'Definition of done is required.');
+    if(base.custom)value={...base,...value};
+    value.mentionRecipients=Object.fromEntries(['acceptance','evidence','notes'].map(field=>[field,accounts.filter(a=>mentionedOwners(String(value[field]||''),[a.username||a.name]).length).map(a=>a.id)]));
     if(accepted)value.closedAt=previous?.payload.status==='Accepted'?previous.payload.closedAt:new Date().toISOString();
    }else{
     if(!canRecordMetrics(user.role,user.owner))throw new ApiError(403,'Daily results may be recorded by Nova, a reviewer, or an administrator.');

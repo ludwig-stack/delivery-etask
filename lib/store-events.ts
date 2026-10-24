@@ -1,4 +1,4 @@
-export type EventRow={id:string;entity_type:'task'|'milestone'|'metrics';entity_id:string;version:number;payload:string;actor_id:string;actor_name:string;at:string};
+export type EventRow={id:string;entity_type:'task'|'milestone'|'metrics'|'profile'|'settings'|'inbox';entity_id:string;version:number;payload:string;actor_id:string;actor_name:string;at:string};
 type LoginAttempt={identifier:string;at:string};
 export type StoreData={schema:'dsi-json-store/1';revision:number;updatedAt:string;events:EventRow[];loginAttempts:LoginAttempt[]};
 export class StoreConflict extends Error {}
@@ -12,7 +12,7 @@ export function validateEvents(events:unknown):asserts events is EventRow[] {
  if(!Array.isArray(events))throw new Error('Invalid JSON event history.');
  const ids=new Set<string>(),versions=new Map<string,Set<number>>();
  for(const e of events){
-  if(!e||typeof e!=='object'||!['task','milestone','metrics'].includes(e.entity_type)||!Number.isSafeInteger(e.version)||e.version<1)throw new Error('Invalid JSON event record.');
+  if(!e||typeof e!=='object'||!['task','milestone','metrics','profile','settings','inbox'].includes(e.entity_type)||!Number.isSafeInteger(e.version)||e.version<1)throw new Error('Invalid JSON event record.');
   for(const field of ['id','entity_id','payload','actor_id','actor_name','at'])if(typeof e[field]!=='string'||!e[field])throw new Error(`Invalid event ${field}.`);
   if(!Number.isFinite(Date.parse(e.at)))throw new Error('Invalid event timestamp.');
   const payload=JSON.parse(e.payload);if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new Error('Invalid event payload.');

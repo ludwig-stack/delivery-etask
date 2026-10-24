@@ -7,7 +7,7 @@
   },
   "scripts": {
     "install:ci": "node scripts/install-ci.mjs",
-    "dev": "next dev --hostname 127.0.0.1 --port 5173",
+    "dev": "node scripts/dev-stage-one.mjs",
     "build": "next build && node scripts/prepare-standalone.mjs",
     "start": "node --experimental-strip-types scripts/start-server.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
@@ -23,7 +23,8 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --config wrangler.d1.jsonc --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --config wrangler.d1.jsonc --remote",
     "db:deploy": "wrangler deploy --config wrangler.d1.jsonc",
-    "test:api:d1": "node --experimental-strip-types scripts/test-d1-api.mjs"
+    "test:api:d1": "node --experimental-strip-types scripts/test-d1-api.mjs",
+    "dev:stage1": "node scripts/dev-stage-one.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

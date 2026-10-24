@@ -24,7 +24,9 @@
       }
     ],
     "paths": {
-      "@delivery/runtime": ["./lib/runtime-node.ts"],
+      "@delivery/runtime": [
+        "./lib/runtime-node.ts"
+      ],
       "@/*": [
         "./*"
       ]
@@ -40,7 +42,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    ".next-stage1/types/**/*.ts",
+    ".next-stage1/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
