@@ -1,3 +1,4 @@
+import {deliverableDetails,appendComment,type DeliverableComment} from '../../../lib/stage-four';
 import {getStore} from '@delivery/runtime';
 import {StoreConflict,type EventRow} from '../../../lib/store-events';
 import {getSessionUser,sameOrigin,resolvedAccounts} from '../../../lib/auth';
@@ -52,14 +53,23 @@ export async function POST(request:Request){
     }
     if(!base)throw new ApiError(404,'This task is not in the active plan.');
     if(!canReview(user.role)&&(body.entityType==='milestone'||base.owner!==user.owner))throw new ApiError(403,'You may update only your assigned deliverables.');
+    const current={...base,...previous?.payload} as Task;
+    if(body.data.action==='comment'){
+     const result=appendComment((current.comments||[]) as DeliverableComment[],body.data,{id:user.id,name:user.displayName});
+     if(result.error)throw new ApiError(400,result.error);
+     const at=new Date().toISOString(),version=body.version+1;
+     return {id:crypto.randomUUID(),entity_type:body.entityType,entity_id:body.entityId,version,payload:JSON.stringify({...current,comments:result.value,version,updatedAt:at}),actor_id:user.userId,actor_name:user.displayName,at};
+    }
+    const details=deliverableDetails(current,body.data,user.role,plan);
+    if(details.error)throw new ApiError(canReview(user.role)?400:403,details.error);
     if(!canReview(user.role)&&(body.data.status==='Accepted'||previous?.payload.status==='Accepted'))throw new ApiError(403,'Only a reviewer or administrator can accept or reopen work.');
     if(body.data.status==='Accepted'&&!canAcceptTask(user.role,user.owner,base.owner))throw new ApiError(403,'A different authorized reviewer must accept your own work.');
     const tasks=work.map(t=>({...t,...latest.find(e=>e.entityId===t.id)?.payload})) as Task[];
     const accepted=body.data.status==='Accepted';
     const result=validateTaskUpdate(base,{...body.data,version:body.version,acceptedBy:accepted?user.displayName:'',reviewNote:accepted?(user.role==='admin'?(body.data.reviewNote||`Administrator approval by ${user.displayName}.`):(user.delegation||body.data.reviewNote||(user.owner==='Wyline'?`Approval by ${user.displayName}.`:''))):body.data.reviewNote},tasks,[...plan.people.map(p=>p.name),user.displayName]);
-    if(result.error)throw new ApiError(400,result.error);value={...result.value,acceptance:typeof body.data.acceptance==='string'?body.data.acceptance.trim().slice(0,4000):base.acceptance};
+    if(result.error)throw new ApiError(400,result.error);value={...result.value,...details.value,comments:current.comments||[]};
     if(!value.acceptance)throw new ApiError(400,'Definition of done is required.');
-    if(base.custom)value={...base,...value};
+    if(base.custom)value={...current,...value};
     value.mentionRecipients=Object.fromEntries(['acceptance','evidence','notes'].map(field=>[field,accounts.filter(a=>mentionedOwners(String(value[field]||''),[a.username||a.name]).length).map(a=>a.id)]));
     if(accepted)value.closedAt=previous?.payload.status==='Accepted'?previous.payload.closedAt:new Date().toISOString();
    }else{

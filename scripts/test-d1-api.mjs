@@ -27,7 +27,7 @@ try{
   await new Promise(resolve=>setTimeout(resolve,200));
  }
  if(!ready)throw new Error('Isolated app did not become ready. '+output);
- for(const script of ['scripts/test-api.mjs','scripts/test-stage-one-api.mjs','scripts/test-stage-three-api.mjs']){
+ for(const script of ['scripts/test-api.mjs','scripts/test-stage-four-api.mjs','scripts/test-stage-one-api.mjs','scripts/test-stage-three-api.mjs']){
  const code=await new Promise((resolve,reject)=>{
   const checks=spawn(process.execPath,[script],{env,stdio:'inherit'});
   checks.on('error',reject);checks.on('exit',resolve);

@@ -1,7 +1,7 @@
 export const STATUSES = ["Ready", "In progress", "Blocked", "Review", "Accepted", "Deferred"] as const;
 export type Status = typeof STATUSES[number];
 export type Task = {
-  id: string; date: string; originalDueDate?: string; dueTime?: string;
+  id: string; date: string; startDate?: string; originalDueDate?: string; dueTime?: string;
   owner: string; support?: string[] | string; workstream: string; title: string;
   deliverable: string; target: number | string | null; unit?: string;
   estimateHours?: number; dependencies?: string[]; acceptance: string;
