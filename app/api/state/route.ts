@@ -1,4 +1,4 @@
-import {deliverableDetails,appendComment,type DeliverableComment} from '../../../lib/stage-four';
+import {deliverableDetails,appendComment,changeComment,type DeliverableComment} from '../../../lib/stage-four';
 import {getStore} from '@delivery/runtime';
 import {StoreConflict,type EventRow} from '../../../lib/store-events';
 import {getSessionUser,sameOrigin,resolvedAccounts} from '../../../lib/auth';
@@ -54,9 +54,10 @@ export async function POST(request:Request){
     if(!base)throw new ApiError(404,'This task is not in the active plan.');
     if(!canReview(user.role)&&(body.entityType==='milestone'||base.owner!==user.owner))throw new ApiError(403,'You may update only your assigned deliverables.');
     const current={...base,...previous?.payload} as Task;
-    if(body.data.action==='comment'){
-     const result=appendComment((current.comments||[]) as DeliverableComment[],body.data,{id:user.id,name:user.displayName});
-     if(result.error)throw new ApiError(400,result.error);
+    if(['comment','editComment','deleteComment'].includes(String(body.data.action))){
+     const comments=(current.comments||[]) as DeliverableComment[];
+     const result=body.data.action==='comment'?{...appendComment(comments,body.data,{id:user.id,name:user.displayName}),status:400}:changeComment(comments,body.data,user.id);
+     if(result.error)throw new ApiError(result.status||400,result.error);
      const at=new Date().toISOString(),version=body.version+1;
      return {id:crypto.randomUUID(),entity_type:body.entityType,entity_id:body.entityId,version,payload:JSON.stringify({...current,comments:result.value,version,updatedAt:at}),actor_id:user.userId,actor_name:user.displayName,at};
     }

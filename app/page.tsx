@@ -7,5 +7,5 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const user=await getSessionUser();
   if(!user) redirect('/login');
-  return <DeliveryConsole plan={source as unknown as Plan} viewer={user.displayName} role={user.role} accountOwner={user.owner}/>;
+  return <DeliveryConsole plan={source as unknown as Plan} viewer={user.displayName} viewerId={user.id} role={user.role} accountOwner={user.owner}/>;
 }

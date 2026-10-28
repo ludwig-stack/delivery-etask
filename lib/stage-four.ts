@@ -2,6 +2,21 @@ import type {Plan, Task} from './delivery.ts';
 import {canReview} from './permissions.ts';
 
 export type DeliverableComment = {id:string; parentId:string|null; authorId:string; authorName:string; at:string; text:string};
+export type CommentChange = {action:'comment';text:string;parentId:string|null}|{action:'editComment';commentId:string;text:string}|{action:'deleteComment';commentId:string};
+
+export function changeComment(comments:DeliverableComment[],input:Record<string,unknown>,authorId:string) {
+ const comment=comments.find(c=>c.id===input.commentId);
+ if(!comment)return {error:'This comment could not be found. Refresh and try again.',status:404};
+ if(comment.authorId!==authorId)return {error:'You may edit or delete only your own comments.',status:403};
+ if(input.action==='deleteComment'){
+  if(comments.some(c=>c.parentId===comment.id))return {error:'Comments with replies cannot be deleted. You can still edit your comment.',status:400};
+  return {value:comments.filter(c=>c.id!==comment.id)};
+ }
+ if(input.action!=='editComment')return {error:'Unknown comment action.',status:400};
+ if(typeof input.text!=='string'||!input.text.trim()||input.text.trim().length>4000)return {error:'Enter a comment of up to 4000 characters.',status:400};
+ const text=input.text.trim();
+ return {value:comments.map(c=>c.id===comment.id?{...c,text}:c)};
+}
 
 export function validateSchedule(start:unknown,due:unknown,plan:Plan):string|undefined {
  if(typeof start!=='string'||typeof due!=='string'||![start,due].every(date=>plan.calendar.some(d=>d.date===date)))return 'Choose start and due dates inside the project window.';

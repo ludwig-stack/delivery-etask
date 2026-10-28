@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {deliverableDetails,appendComment,validateSchedule} from '../lib/stage-four.ts';
+import {deliverableDetails,appendComment,changeComment,validateSchedule} from '../lib/stage-four.ts';
 import {validateNewTask} from '../lib/stage-one.ts';
 import type {Task,Plan} from '../lib/delivery.ts';
 const plan={people:[{name:'Joey'}],calendar:['2026-10-24','2026-10-25','2026-10-26'].map(date=>({date}))} as unknown as Plan;
@@ -29,4 +29,44 @@ test('comments and replies use authenticated author and server time while preser
  assert.equal(reply.length,2);assert.equal(reply[1].parentId,first.id);assert.deepEqual(reply[0],first);
  assert(appendComment(reply,{text:' '},{id:'staff',name:'Staff'}).error);
  assert(appendComment(reply,{text:'Reply',parentId:'missing'},{id:'staff',name:'Staff'}).error);
+});
+
+
+test('only the authenticated comment author can edit or delete, regardless of claimed identity',()=>{
+ const comments=appendComment([],{text:'Original'},{id:'owner-id',name:'Shared Name'}).value!;
+ const comment=comments[0];
+ for(const action of ['editComment','deleteComment']){
+  for(const actor of ['another-staff','reviewer','admin']){
+   const result=changeComment(comments,{action,commentId:comment.id,text:'Changed',authorId:comment.authorId,authorName:comment.authorName},actor);
+   assert.equal(result.status,403);
+   assert.equal(result.value,undefined);
+  }
+ }
+ const edited=changeComment(comments,{action:'editComment',commentId:comment.id,text:' Updated ',authorId:'forged',parentId:'forged',at:'forged'},comment.authorId).value!;
+ assert.deepEqual(edited,[{...comment,text:'Updated'}]);
+ assert.equal(comments[0].text,'Original');
+ assert.deepEqual(changeComment(edited,{action:'deleteComment',commentId:comment.id},comment.authorId).value,[]);
+});
+
+test('comments with replies remain editable but cannot be deleted; leaf replies can be removed',()=>{
+ const original=appendComment([],{text:'Parent'},{id:'a',name:'A'}).value!;
+ const parent=original[0];
+ const thread=appendComment(original,{text:'Reply',parentId:parent.id},{id:'b',name:'B'}).value!;
+ const reply=thread[1];
+ assert.equal(changeComment(thread,{action:'deleteComment',commentId:parent.id},'a').status,400);
+ const edited=changeComment(thread,{action:'editComment',commentId:parent.id,text:'Edited parent'},'a').value!;
+ assert.equal(edited[0].text,'Edited parent');assert.deepEqual(edited[1],reply);
+ const nested=appendComment(thread,{text:'Nested',parentId:reply.id},{id:'b',name:'B'}).value!;
+ assert.equal(changeComment(nested,{action:'deleteComment',commentId:reply.id},'b').status,400);
+ const removed=changeComment(thread,{action:'deleteComment',commentId:reply.id},'b').value!;
+ assert.deepEqual(removed,original);
+ assert.deepEqual(changeComment(removed,{action:'deleteComment',commentId:parent.id},'a').value,[]);
+});
+
+test('comment changes reject missing comments, unsupported actions, and invalid text',()=>{
+ const comments=appendComment([],{text:'Original'},{id:'a',name:'A'}).value!;
+ for(const text of ['', '   ', 'x'.repeat(4001), null, 42])assert.equal(changeComment(comments,{action:'editComment',commentId:comments[0].id,text},'a').status,400);
+ assert.equal(changeComment(comments,{action:'deleteComment',commentId:'missing'},'a').status,404);
+ assert.equal(changeComment(comments,{action:'unknown',commentId:comments[0].id},'a').status,400);
+ assert.equal(changeComment(comments,{action:'editComment',commentId:comments[0].id,text:'x'.repeat(4000)},'a').value?.[0].text.length,4000);
 });
