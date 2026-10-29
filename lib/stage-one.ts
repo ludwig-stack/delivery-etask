@@ -34,7 +34,8 @@ export function notificationsFor(events:EventRow[],owner:string,baseTasks:Task[]
   for(const field of ['acceptance','evidence','notes'])if(mentioned(next,field)&&!mentioned(old,field,base?.[field]||''))notices.push({id:e.id+':'+field,taskId:e.entity_id,kind:'mention',message:`${e.actor_name} mentioned you in ${field==='acceptance'?'definition of done':field==='evidence'?'evidence':'working notes'}: ${next.title||base?.title||e.entity_id}`,at:e.at});
   previous.set(key,next);
  }
- return notices.reverse();
+ const gone=new Set([...previous].filter(([,v])=>v.deleted===true).map(([k])=>k.split(':').slice(1).join(':')));
+ return notices.filter(n=>!gone.has(n.taskId)).reverse();
 }
 export function safeProfile(value:unknown) {return Object.fromEntries(Object.entries(value&&typeof value==='object'?value:{}).filter(([key])=>!['passwordHash','salt'].includes(key)));}
 export function validImage(value:unknown) {return typeof value==='string'&&(value===''||(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value)&&value.length<350000));}

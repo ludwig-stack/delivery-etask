@@ -5,6 +5,7 @@ import {getSessionUser,sameOrigin,resolvedAccounts} from '../../../lib/auth';
 import {canReview,canAcceptTask,canRecordMetrics} from '../../../lib/permissions';
 import source from '../../data/plan.json';
 import {type Plan,type Task,gateTasks,validateTaskUpdate,validateMetrics} from '../../../lib/delivery';
+import {deleteDeliverable,isDeleted,withoutDeleted} from '../../../lib/stage-six';
 import {validateNewTask,notificationsFor,mentionedOwners} from '../../../lib/stage-one';
 const plan=source as unknown as Plan;
 export const dynamic='force-dynamic';
@@ -22,11 +23,12 @@ export async function GET(){
   const {latest,audit}=await getStore().snapshot();
   const overrides:Record<string,unknown>={},metrics:Record<string,unknown>={},milestones:Record<string,unknown>={};
   for(const raw of latest.filter(e=>['task','milestone','metrics'].includes(e.entity_type))){const e=decode(raw);(e.entityType==='task'?overrides:e.entityType==='milestone'?milestones:metrics)[e.entityId]={...e.payload,version:e.version,updatedAt:e.at};}
+  const gone=new Set(latest.filter(e=>e.entity_type==='task'&&isDeleted(JSON.parse(e.payload))).map(e=>e.entity_id));
   const inbox=latest.find(e=>e.entity_type==='inbox'&&e.entity_id===user.id);
   const accounts=await resolvedAccounts();
   const directory=accounts.map(a=>({id:a.id,name:a.name,owner:a.owner,username:a.username||a.name}));
   const notifications=notificationsFor(await getStore().allEvents(),user.owner,[...plan.tasks,...gateTasks(plan)],user.id);
-  return Response.json({overrides,metrics,milestones,audit:audit.filter(e=>['task','milestone','metrics'].includes(e.entity_type)).map(decode),notifications,inbox:{version:inbox?.version||0,readAt:inbox?JSON.parse(inbox.payload).readAt:''},directory,user:{name:user.displayName},syncedAt:new Date().toISOString()},{headers:{'Cache-Control':'no-store'}});
+  return Response.json({overrides,metrics,milestones,audit:audit.filter(e=>['task','milestone','metrics'].includes(e.entity_type)&&(!gone.has(e.entity_id)||isDeleted(JSON.parse(e.payload)))).map(decode),notifications,inbox:{version:inbox?.version||0,readAt:inbox?JSON.parse(inbox.payload).readAt:''},directory,user:{name:user.displayName},syncedAt:new Date().toISOString()},{headers:{'Cache-Control':'no-store'}});
  }catch(error){return failure(error);}
 }
 export async function POST(request:Request){
@@ -44,8 +46,9 @@ export async function POST(request:Request){
    if((previous?.version||0)!==body.version)throw new ApiError(409,'Someone updated this record while you were editing. Refresh, review their change, then save again.');
    let value:any;
    if(body.entityType==='task'||body.entityType==='milestone'){
-    const custom=latest.filter(e=>e.entityType==='task'&&e.payload.custom).map(e=>({...e.payload,id:e.entityId}));
-    const work=[...plan.tasks,...custom,...gateTasks(plan)];
+    const deletedIds=new Set(latest.filter(e=>e.entityType==='task'&&isDeleted(e.payload)).map(e=>e.entityId));
+    const custom=latest.filter(e=>e.entityType==='task'&&e.payload.custom&&!isDeleted(e.payload)).map(e=>({...e.payload,id:e.entityId}));
+    const work=withoutDeleted([...plan.tasks,...custom,...gateTasks(plan)],deletedIds);
     let base=work.find(t=>t.id===body.entityId&&(body.entityType==='task'?t.workstream!=='Delivery gate':t.workstream==='Delivery gate'));
     if(!base&&body.entityType==='task'&&/^CUSTOM-[a-f0-9-]{36}$/.test(body.entityId)&&body.version===0){
      if(!canReview(user.role))throw new ApiError(403,'Only reviewers and administrators can add deliverables.');
@@ -54,6 +57,12 @@ export async function POST(request:Request){
     if(!base)throw new ApiError(404,'This task is not in the active plan.');
     if(!canReview(user.role)&&(body.entityType==='milestone'||base.owner!==user.owner))throw new ApiError(403,'You may update only your assigned deliverables.');
     const current={...base,...previous?.payload} as Task;
+    if(body.data.action==='deleteDeliverable'){
+     const result=deleteDeliverable(current,user.role,{id:user.id,name:user.displayName},body.entityType==='milestone');
+     if(result.error)throw new ApiError(result.status,result.error);
+     const at=new Date().toISOString(),version=body.version+1;
+     return {id:crypto.randomUUID(),entity_type:body.entityType,entity_id:body.entityId,version,payload:JSON.stringify({...result.value,version,updatedAt:at}),actor_id:user.userId,actor_name:user.displayName,at};
+    }
     if(['comment','editComment','deleteComment'].includes(String(body.data.action))){
      const comments=(current.comments||[]) as DeliverableComment[];
      const result=body.data.action==='comment'?{...appendComment(comments,body.data,{id:user.id,name:user.displayName}),status:400}:changeComment(comments,body.data,user.id);
